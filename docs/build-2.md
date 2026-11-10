@@ -36,7 +36,11 @@
 
 ### S04: As an organizer, I want to publish and unpublish an event, so that I control when it goes public
 
-*Written by you, in pairs, during the Build 2 class. Add your three criteria here before you paste the AI prompt below.*
+Implement publishEvent and unpublishEvent. S04 acceptance criteria:
+1. Given a draft event with at least one tier, when the organizer publishes it, then it appears in listEventSummaries; when they unpublish it, it no longer appears.
+2. Given an event with no tiers, when anyone tries to publish it, then it throws a DomainError with code INVALID_STATE and the event stays a draft.
+3. Given a draft event, when the public list is read, then the draft is not included.
+Write one test per criterion.
 
 ### S05: As an attendee, I want to search, filter and sort published events, so that I can find one I like
 
