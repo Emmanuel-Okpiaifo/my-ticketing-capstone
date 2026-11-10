@@ -3,7 +3,12 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DomainError } from '../domain/errors.js';
+import { createMemoryRepository } from '../repositories/memory.js';
+import { createBookingService } from '../services/bookingService.js';
+import { createEventService } from '../services/eventService.js';
+import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
 import { Router } from './router.js';
+import { registerApiRoutes } from './routes.js';
 
 const DEFAULT_PUBLIC_DIRECTORY = fileURLToPath(new URL('../../public/', import.meta.url));
 const MAX_JSON_BYTES = 1_048_576;
@@ -27,6 +32,23 @@ function sendJson(response, statusCode, value) {
 
 function sendError(response, statusCode, code, message) {
   sendJson(response, statusCode, { error: { code, message } });
+}
+
+function statusForError(error) {
+  const statuses = {
+    FORBIDDEN: 403,
+    INVALID_JSON: 400,
+    INVALID_PATH: 400,
+    INVALID_STATE: 409,
+    INVALID_TRANSITION: 409,
+    NOT_FOUND: 404,
+    PAYMENT_DECLINED: 402,
+    PAYLOAD_TOO_LARGE: 413,
+    SOLD_OUT: 409,
+    UNAUTHENTICATED: 401,
+    VALIDATION: 400,
+  };
+  return statuses[error.code] ?? 400;
 }
 
 async function readJsonBody(request) {
@@ -118,24 +140,33 @@ async function serveStatic(response, publicDirectory, pathname, method) {
   }
 }
 
-function createApplicationRouter() {
+function createApplicationRouter(services) {
   const router = new Router();
   router.add('GET', '/health', (_context) => ({
     statusCode: 200,
     body: { status: 'ok' },
   }));
+  registerApiRoutes(router, services);
   return router;
 }
 
-export function createApp({ publicDirectory = DEFAULT_PUBLIC_DIRECTORY } = {}) {
-  const router = createApplicationRouter();
+export function createApp({
+  publicDirectory = DEFAULT_PUBLIC_DIRECTORY,
+  repository = createMemoryRepository(),
+  paymentGateway = createMockPaymentGateway(),
+} = {}) {
+  const services = {
+    eventService: createEventService(repository),
+    bookingService: createBookingService(repository, paymentGateway),
+  };
+  const router = createApplicationRouter(services);
 
   return async function app(request, response) {
     try {
       const requestUrl = new URL(request.url, 'http://localhost');
       const body = await readJsonBody(request);
-      if (requestUrl.pathname === '/health' && request.method === 'GET') {
-        const route = router.match(request.method, requestUrl.pathname);
+      const route = router.match(request.method, requestUrl.pathname);
+      if (route) {
         const result = await route.handler({
           request,
           params: route.params,
@@ -158,13 +189,7 @@ export function createApp({ publicDirectory = DEFAULT_PUBLIC_DIRECTORY } = {}) {
       await serveStatic(response, publicDirectory, requestUrl.pathname, request.method);
     } catch (error) {
       if (error instanceof DomainError) {
-        const statusCode =
-          error.code === 'INVALID_JSON' || error.code === 'INVALID_PATH'
-            ? 400
-            : error.code === 'PAYLOAD_TOO_LARGE'
-              ? 413
-              : 400;
-        sendError(response, statusCode, error.code, error.message);
+        sendError(response, statusForError(error), error.code, error.message);
         return;
       }
       sendError(response, 500, 'INTERNAL_ERROR', 'Internal server error.');

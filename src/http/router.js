@@ -1,3 +1,5 @@
+import { DomainError } from '../domain/errors.js';
+
 function normalizeMethod(method) {
   if (typeof method !== 'string' || method.trim() === '') {
     throw new TypeError('Route method must be a non-empty string.');
@@ -49,7 +51,11 @@ export class Router {
           if (expected.length === 1) {
             throw new TypeError('Route parameter names cannot be empty.');
           }
-          params[expected.slice(1)] = decodeURIComponent(actual);
+          try {
+            params[expected.slice(1)] = decodeURIComponent(actual);
+          } catch {
+            throw new DomainError('Request path contains invalid encoding.', 'INVALID_PATH');
+          }
         } else if (expected !== actual) {
           matched = false;
           break;
