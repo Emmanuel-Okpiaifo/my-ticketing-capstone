@@ -9,7 +9,8 @@
   "scripts": {
     "test": "node --test",
     "demo": "node scripts/demo.js",
-    "benchmark": "node scripts/benchmark-lookup.js"
+    "benchmark": "node scripts/benchmark-lookup.js",
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
