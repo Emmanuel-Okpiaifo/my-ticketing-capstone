@@ -35,3 +35,21 @@
 **How I fixed it:** I asked it to mark a booking as "payment in progress" before charging, reject a second request with INVALID_TRANSITION, and clear the mark on decline so the attendee can retry. I also asked for POST /api/events/:id/unpublish (organizer only), with tests and a curl example. Added a Promise.all test that checks for exactly one success and one charge. 37 tests passing.
 
 **What I learned:** A check followed by an await is a race window. Tests that run steps one after another won't catch it, so concurrency needs its own test that fires requests at the same time. The same problem comes back with the last seat in Build 5.
+
+## Build 5: SQLite and the overselling fix
+
+**Tool:** GitHub Copilot (VS Code)
+
+**What I asked for:** Prompt 1 (move to node:sqlite with constraints, a repository with the same methods as memory.js, a seed script, and an oversell demo without fixing anything) and Prompt 2 (fix it in the database with one atomic UPDATE and add a test). I also asked it to keep the database file out of git.
+
+**What it produced:** schema.sql with PRIMARY KEY, FOREIGN KEY, UNIQUE and CHECK (sold >= 0 AND sold <= capacity); a SQLite repository using ? placeholders everywhere; seed and oversell scripts; reserveSeats using UPDATE ... SET sold = sold + ? WHERE ... AND sold + ? <= capacity and checking result.changes; test/oversell.test.js; and a restart test showing the data survives.
+
+**Results:** Before the fix, 50 of 50 bookings succeeded but only 1 seat was recorded as sold. After the fix, 1 succeeded, 49 got SOLD_OUT, and 1 seat was sold. With the fix removed, the oversell test fails (50 bookings instead of 1).
+
+**What it got wrong:**
+- It said the CHECK constraint kept sold at 1 before the fix. It was really a lost update: all 50 requests read sold = 0 and each wrote sold = 1, so 49 sales were overwritten without any error. The CHECK never fired.
+- node:sqlite is synchronous, so it added a setImmediate delay in findTier to make the race happen. I kept it because real async drivers have the same gap between reading and writing, and the test needs it to fail when the fix is removed, but the delay is artificial.
+- The SOLD_OUT message for the losing requests used the stale count ("Only 1 ticket(s) remain"). I had it re-read the tier for the message.
+- It went straight through Prompt 2 without stopping after Prompt 1, so I checked the "before" numbers in its report.
+
+**What I learned:** Reading a value, then saving a new value calculated in JavaScript, loses updates under concurrency. The condition and the change have to happen in one SQL statement, and the number of changed rows tells you who won. A lock variable only works inside one process, and checking twice still leaves a gap.

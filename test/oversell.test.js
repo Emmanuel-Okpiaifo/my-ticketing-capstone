@@ -44,6 +44,7 @@ test('50 simultaneous attempts to book one seat allow exactly one booking', asyn
   assert.ok(rejected.every((result) =>
     result.reason instanceof DomainError && result.reason.code === 'SOLD_OUT'
   ));
+  assert.ok(rejected.every((result) => result.reason.message === 'The "Final seat" tier is sold out.'));
   assert.equal((await repository.listBookings()).length, 1);
 
   const storedEvent = await repository.getEvent(event.id);
