@@ -169,11 +169,11 @@ For a walkthrough in the terminal, follow [docs/api-examples.md](docs/api-exampl
 ## Build 5: SQLite and the last ticket
 
 ```bash
-npm run seed       # once: adds a few published events to data/ticketing.db
+npm run seed       # adds a few published events to data/ticketing.db (only once)
 npm start          # the API now keeps its data after a restart
-npm run oversell   # 50 people try to book the last seat at the same moment
+npm run oversell   # reproduces 50 simultaneous attempts to book one seat
 ```
 
-`npm run oversell` runs the race twice. The Build 4 way (read the tier, check in JavaScript, then save) lets all 50 bookings through. The Build 5 way takes the seats with one atomic statement, `UPDATE ticket_tiers SET sold = sold + ? WHERE id = ? AND sold + ? <= capacity`, and only the request that changed a row gets the seat: 1 succeeds, 49 get `SOLD_OUT`. `test/oversell.test.js` proves it, and fails if the fix is removed.
+The oversell demo sends 50 simultaneous booking attempts for one seat. The conditional atomic database update allows exactly 1 request to succeed and returns `SOLD_OUT` for the other 49; `test/oversell.test.js` verifies the rule.
 
-The server's database lives in `data/ticketing.db` (set `DATABASE_PATH` to use another file). Delete the `data/` folder to start again. The schema, with its PRIMARY KEY, FOREIGN KEY, UNIQUE and CHECK constraints, is in `src/db/schema.sql`.
+The server's database lives in `data/ticketing.db` (set `DATABASE_PATH` to use another file). Database files are ignored by Git. The schema, with its PRIMARY KEY, FOREIGN KEY, UNIQUE and CHECK constraints, is in `src/db/schema.sql`.

@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 function parsePort(value) {
   if (value === undefined || value === '') {
     return 3000;
@@ -11,3 +13,4 @@ function parsePort(value) {
 }
 
 export const PORT = parsePort(process.env.PORT);
+export const DATABASE_PATH = process.env.DATABASE_PATH ?? path.resolve('data', 'ticketing.db');
