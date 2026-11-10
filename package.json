@@ -10,7 +10,9 @@
     "test": "node --test",
     "demo": "node scripts/demo.js",
     "benchmark": "node scripts/benchmark-lookup.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed": "node scripts/seed.js",
+    "oversell": "node scripts/oversell-demo.js"
   },
   "keywords": [],
   "author": "",

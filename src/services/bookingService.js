@@ -55,7 +55,21 @@ export function createBookingService(repository, paymentGateway) {
         quantity: input?.quantity,
       });
       booking.userId = userId;
-      await repository.saveEvent(tierResult.event);
+      if (typeof repository.reserveSeats === 'function') {
+        const reserved = await repository.reserveSeats(
+          tierResult.event.id,
+          tierResult.tier.id,
+          booking.quantity,
+        );
+        if (!reserved) {
+          throw new DomainError(
+            `Only ${tierResult.tier.remaining} ticket(s) remain in the "${tierResult.tier.name}" tier.`,
+            'SOLD_OUT',
+          );
+        }
+      } else {
+        await repository.saveEvent(tierResult.event);
+      }
       await repository.saveBooking(booking);
       return booking;
     },
