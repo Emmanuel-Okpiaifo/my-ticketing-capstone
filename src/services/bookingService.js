@@ -62,10 +62,17 @@ export function createBookingService(repository, paymentGateway) {
           booking.quantity,
         );
         if (!reserved) {
-          throw new DomainError(
-            `Only ${tierResult.tier.remaining} ticket(s) remain in the "${tierResult.tier.name}" tier.`,
-            'SOLD_OUT',
+          const currentTier = await repository.getTier(
+            tierResult.event.id,
+            tierResult.tier.id,
           );
+          if (!currentTier) {
+            throw new DomainError(`Ticket tier "${tierResult.tier.id}" was not found.`, 'NOT_FOUND');
+          }
+          const message = currentTier.remaining === 0
+            ? `The "${currentTier.name}" tier is sold out.`
+            : `Only ${currentTier.remaining} ticket(s) remain in the "${currentTier.name}" tier.`;
+          throw new DomainError(message, 'SOLD_OUT');
         }
       } else {
         await repository.saveEvent(tierResult.event);
