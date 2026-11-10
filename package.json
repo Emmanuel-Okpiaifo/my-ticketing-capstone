@@ -1,0 +1,16 @@
+{
+  "name": "my-ticketing-capstone",
+  "version": "1.0.0",
+  "description": "**Organizers publish events. Attendees buy tickets. Staff check people in with QR codes.**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
