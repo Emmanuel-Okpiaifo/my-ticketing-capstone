@@ -346,6 +346,30 @@ test('S06: a published event booking is pending, priced in cents, and releases t
   assert.equal(tier.sold, 2);
 });
 
+test('S06: booking an unpublished event returns INVALID_STATE without changing anything', () => {
+  const store = makeStore();
+  const event = addEvent(store, {
+    title: 'Draft event',
+    tiers: [{ name: 'General', priceCents: 1200, capacity: 3 }],
+  });
+  const tier = [...event.tiers.values()][0];
+  const before = { remaining: tier.remaining, sold: tier.sold, bookings: store.bookingsByReference.size };
+
+  expectDomainCode(
+    () => bookTickets(store, {
+      eventId: event.id,
+      tierId: tier.id,
+      attendeeName: 'Attendee',
+      quantity: 1,
+    }),
+    'INVALID_STATE',
+  );
+  assert.deepEqual(
+    { remaining: tier.remaining, sold: tier.sold, bookings: store.bookingsByReference.size },
+    before,
+  );
+});
+
 test('S06: booking more seats than remain returns SOLD_OUT without changing anything', () => {
   const store = makeStore();
   const event = addEvent(store, {

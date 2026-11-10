@@ -36,11 +36,15 @@
 
 ### S04: As an organizer, I want to publish and unpublish an event, so that I control when it goes public
 
-Implement publishEvent and unpublishEvent. S04 acceptance criteria:
-1. Given a draft event with at least one tier, when the organizer publishes it, then it appears in listEventSummaries; when they unpublish it, it no longer appears.
-2. Given an event with no tiers, when anyone tries to publish it, then it throws a DomainError with code INVALID_STATE and the event stays a draft.
-3. Given a draft event, when the public list is read, then the draft is not included.
-Write one test per criterion.
+- **Given** a draft event with at least one tier
+  **When** the organizer publishes it
+  **Then** it appears on the public list, and when they unpublish it, it no longer appears.
+- **Given** an event with no tiers
+  **When** anyone tries to publish it
+  **Then** the request is rejected with `INVALID_STATE` and the event stays a draft.
+- **Given** a draft event
+  **When** the public list is read
+  **Then** the draft is not included.
 
 ### S05: As an attendee, I want to search, filter and sort published events, so that I can find one I like
 

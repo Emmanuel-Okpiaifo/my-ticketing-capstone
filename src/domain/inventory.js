@@ -198,6 +198,9 @@ export function bookTickets(store, bookingInput) {
   assertObject(bookingInput, 'Booking');
   const event = getEvent(store, bookingInput.eventId);
   const tier = getTier(event, bookingInput.tierId);
+  if (!event.published) {
+    throw new DomainError('Tickets cannot be booked for an unpublished event.', 'INVALID_STATE');
+  }
   const attendeeName = requiredText(bookingInput.attendeeName, 'Attendee name');
   validateQuantity(bookingInput.quantity);
 
