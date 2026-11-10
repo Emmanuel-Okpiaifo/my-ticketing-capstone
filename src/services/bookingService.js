@@ -32,6 +32,7 @@ function requireBookingOwner(booking, userId) {
 
 export function createBookingService(repository, paymentGateway) {
   assertDependencies(repository, paymentGateway);
+  const paymentsInProgress = new Set();
 
   return {
     async create(input, userId) {
@@ -65,24 +66,32 @@ export function createBookingService(repository, paymentGateway) {
         throw new DomainError(`Booking "${reference}" was not found.`, 'NOT_FOUND');
       }
       requireBookingOwner(booking, userId);
+      if (paymentsInProgress.has(reference)) {
+        throw new DomainError('A payment is already in progress for this booking.', 'INVALID_TRANSITION');
+      }
       assertTransition(booking.status, 'paid');
 
       const paymentToken = input?.paymentToken;
       if (paymentToken !== 'tok_success' && paymentToken !== 'tok_declined') {
         throw new DomainError('paymentToken must be tok_success or tok_declined.', 'VALIDATION');
       }
-      const result = await paymentGateway.charge({
-        amountCents: booking.totalCents,
-        decline: paymentToken === 'tok_declined',
-      });
-      if (!result.success) {
-        throw new DomainError('The mock payment was declined.', 'PAYMENT_DECLINED');
-      }
+      paymentsInProgress.add(reference);
+      try {
+        const result = await paymentGateway.charge({
+          amountCents: booking.totalCents,
+          decline: paymentToken === 'tok_declined',
+        });
+        if (!result.success) {
+          throw new DomainError('The mock payment was declined.', 'PAYMENT_DECLINED');
+        }
 
-      booking.status = 'paid';
-      booking.paymentId = result.transactionId;
-      await repository.saveBooking(booking);
-      return booking;
+        booking.status = 'paid';
+        booking.paymentId = result.transactionId;
+        await repository.saveBooking(booking);
+        return booking;
+      } finally {
+        paymentsInProgress.delete(reference);
+      }
     },
 
     async cancel(reference, userId) {

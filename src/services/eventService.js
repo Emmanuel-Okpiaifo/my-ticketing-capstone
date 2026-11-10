@@ -4,6 +4,7 @@ import {
   createStore,
   listEventSummaries,
   publishEvent as publishDomainEvent,
+  unpublishEvent as unpublishDomainEvent,
 } from '../domain/inventory.js';
 import { DomainError } from '../domain/errors.js';
 import { searchEvents } from '../domain/eventSearch.js';
@@ -82,6 +83,19 @@ export function createEventService(repository) {
       publishDomainEvent(domainStore, eventId);
       await repository.saveEvent(event);
       return { id: event.id, status: 'published' };
+    },
+
+    async unpublish(eventId, organizerId) {
+      const event = await repository.getEvent(eventId);
+      if (!event) {
+        throw new DomainError(`Event "${eventId}" was not found.`, 'NOT_FOUND');
+      }
+      requireOwner(event, organizerId);
+      const domainStore = createStore();
+      domainStore.events.set(event.id, event);
+      unpublishDomainEvent(domainStore, eventId);
+      await repository.saveEvent(event);
+      return { id: event.id, status: 'draft' };
     },
 
     async list(query) {

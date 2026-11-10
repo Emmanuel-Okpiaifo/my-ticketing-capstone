@@ -21,6 +21,10 @@ export function registerApiRoutes(router, { eventService, bookingService }) {
     statusCode: 200,
     body: await eventService.publish(params.id, requireUserId(request)),
   }));
+  router.add('POST', '/api/events/:id/unpublish', async ({ request, params }) => ({
+    statusCode: 200,
+    body: await eventService.unpublish(params.id, requireUserId(request)),
+  }));
   router.add('GET', '/api/events', async ({ query }) => ({
     statusCode: 200,
     body: { events: await eventService.list(query) },

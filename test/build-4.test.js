@@ -244,3 +244,125 @@ test('API refuses publishing an event without a tier and reports unknown routes 
   assert.equal(unknown.statusCode, 404);
   assert.equal(parse(unknown).error.code, 'NOT_FOUND');
 });
+
+test('concurrent payments charge a booking only once', async (t) => {
+  let chargeCount = 0;
+  let releaseCharge;
+  const chargeStarted = new Promise((resolve) => {
+    releaseCharge = resolve;
+  });
+  let finishCharge;
+  const chargeResult = new Promise((resolve) => {
+    finishCharge = resolve;
+  });
+  const server = await startServer(t, {
+    paymentGateway: {
+      async charge() {
+        chargeCount += 1;
+        releaseCharge();
+        return chargeResult;
+      },
+    },
+  });
+
+  const organizer = { 'x-user-id': 'organizer-1', 'content-type': 'application/json' };
+  const eventResponse = await request(server, {
+    method: 'POST',
+    path: '/api/events',
+    headers: organizer,
+    body: JSON.stringify({
+      title: 'Concurrency test',
+      city: 'Lagos',
+      venue: 'Hall',
+      startsAt: '2026-12-05',
+    }),
+  });
+  const event = parse(eventResponse);
+  const tierResponse = await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/tiers`,
+    headers: organizer,
+    body: JSON.stringify({ name: 'General', priceCents: 500, capacity: 2 }),
+  });
+  const tier = parse(tierResponse);
+  await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/publish`,
+    headers: { 'x-user-id': 'organizer-1' },
+  });
+  const bookingResponse = await request(server, {
+    method: 'POST',
+    path: '/api/bookings',
+    headers: { 'x-user-id': 'attendee-1', 'content-type': 'application/json' },
+    body: JSON.stringify({ tierId: tier.id, quantity: 1 }),
+  });
+  const booking = parse(bookingResponse);
+  const payRequest = () => request(server, {
+    method: 'POST',
+    path: `/api/bookings/${booking.reference}/pay`,
+    headers: { 'x-user-id': 'attendee-1', 'content-type': 'application/json' },
+    body: JSON.stringify({ paymentToken: 'tok_success' }),
+  });
+
+  const firstPayment = payRequest();
+  await chargeStarted;
+  const secondPayment = payRequest();
+  const secondResponse = await secondPayment;
+  finishCharge({ success: true, transactionId: 'concurrent-test' });
+  const firstResponse = await firstPayment;
+
+  const outcomes = [firstResponse, secondResponse];
+  assert.equal(outcomes.filter((response) => response.statusCode === 200).length, 1);
+  assert.equal(outcomes.filter((response) => response.statusCode === 409).length, 1);
+  assert.equal(
+    outcomes.find((response) => response.statusCode === 409) &&
+      parse(outcomes.find((response) => response.statusCode === 409)).error.code,
+    'INVALID_TRANSITION',
+  );
+  assert.equal(chargeCount, 1);
+});
+
+test('event organizer can unpublish an event but other users cannot', async (t) => {
+  const server = await startServer(t);
+  const eventResponse = await request(server, {
+    method: 'POST',
+    path: '/api/events',
+    headers: { 'x-user-id': 'organizer-1', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Unpublish test',
+      city: 'Lagos',
+      venue: 'Hall',
+      startsAt: '2026-12-05',
+    }),
+  });
+  const event = parse(eventResponse);
+  await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/tiers`,
+    headers: { 'x-user-id': 'organizer-1', 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'General', priceCents: 500, capacity: 2 }),
+  });
+  await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/publish`,
+    headers: { 'x-user-id': 'organizer-1' },
+  });
+
+  const forbidden = await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/unpublish`,
+    headers: { 'x-user-id': 'another-organizer' },
+  });
+  assert.equal(forbidden.statusCode, 403);
+  assert.equal(parse(forbidden).error.code, 'FORBIDDEN');
+  assert.equal(parse(await request(server, { path: '/api/events' })).events.length, 1);
+
+  const unpublished = await request(server, {
+    method: 'POST',
+    path: `/api/events/${event.id}/unpublish`,
+    headers: { 'x-user-id': 'organizer-1' },
+  });
+  assert.equal(unpublished.statusCode, 200);
+  assert.equal(parse(unpublished).status, 'draft');
+  assert.deepEqual(parse(await request(server, { path: '/api/events' })), { events: [] });
+});

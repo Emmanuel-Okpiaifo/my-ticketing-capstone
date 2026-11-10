@@ -55,6 +55,16 @@ curl -i -X POST "http://localhost:3000/api/events/$EVENT_ID/publish" \
 
 An event needs at least one tier before it can be published.
 
+Unpublish the event (only its organizer may do this):
+
+```bash
+curl -i -X POST "http://localhost:3000/api/events/$EVENT_ID/unpublish" \
+  -H 'x-user-id: organizer-1'
+```
+
+The event is removed from public search results. Publish it again before
+continuing with the booking examples.
+
 ## 4. Search published events
 
 All query parameters are optional: `q`, `city`, `from`, `to`,
